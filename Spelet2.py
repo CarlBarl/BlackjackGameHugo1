@@ -18,9 +18,10 @@ BLACK = (0, 0, 0)
 GREEN = (0, 100, 0)
 LIGHT_GREEN = (0, 150, 0)
 DARK_GREEN = (0, 50, 0)
-DARK_RED = (150, 0, 0)
 DARK_BLUE = (0, 0, 150)
 GRAY = (100, 100, 100)
+YELLOW = (255, 255, 0)  # Gul – för knappar
+DARK_RED = (150, 0, 0)  # Lägger till DARK_RED för mini-game
 
 # Kortstorlek
 CARD_WIDTH = 80
@@ -64,8 +65,48 @@ def create_gradient_surface(width, height, top_color, bottom_color):
     return gradient
 
 
-# Här använder vi en blå gradientbakgrund (mörkblå högst upp, ljusare blå längst ner)
+# Bakgrund med blå gradient (mörkblå högst upp, ljusare blå längst ner)
 background = create_gradient_surface(SCREEN_WIDTH, SCREEN_HEIGHT, (0, 0, 128), (0, 0, 255))
+
+
+# ------------------------------
+# Inloggningsskärm
+# ------------------------------
+def login_screen():
+    """
+    Visar en inloggningsskärm där spelaren anger sitt namn.
+    När ett giltigt namn är angivet väljs ett slumpmässigt motståndarnamn.
+    Returnerar (player_name, opponent_name).
+    """
+    input_str = ""
+    input_box = pygame.Rect(SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 - 20, 300, 40)
+    prompt = "Ange ditt namn:"
+    login_done = False
+    while not login_done:
+        clock.tick(FPS)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit();
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_BACKSPACE:
+                    input_str = input_str[:-1]
+                elif event.key == pygame.K_RETURN:
+                    if input_str.strip() != "":
+                        login_done = True
+                else:
+                    input_str += event.unicode
+        screen.blit(background, (0, 0))
+        draw_center_text(screen, "Logga in", 64, WHITE, SCREEN_HEIGHT // 2 - 100)
+        draw_center_text(screen, prompt, 36, WHITE, SCREEN_HEIGHT // 2 - 40)
+        pygame.draw.rect(screen, WHITE, input_box, 2)
+        input_surf = DEFAULT_FONT.render(input_str, True, WHITE)
+        screen.blit(input_surf, (input_box.x + 10, input_box.y + 5))
+        draw_center_text(screen, "Tryck Enter när du är klar", 28, WHITE, SCREEN_HEIGHT // 2 + 60)
+        pygame.display.flip()
+    opponent_list = ["Björn", "Kalle", "Mats", "Sven", "Anders"]
+    opponent_name = random.choice(opponent_list)
+    return input_str.strip(), opponent_name
 
 
 # ------------------------------
@@ -86,7 +127,6 @@ class Card:
 
     def draw(self, surface, x, y, hidden=False):
         if hidden:
-            # Doldt kort (t.ex. dealerens första kort)
             pygame.draw.rect(surface, DARK_BLUE, (x, y, CARD_WIDTH, CARD_HEIGHT))
             pygame.draw.rect(surface, WHITE, (x, y, CARD_WIDTH, CARD_HEIGHT), 2)
             font = pygame.font.Font(None, 48)
@@ -94,13 +134,11 @@ class Card:
             text_rect = text.get_rect(center=(x + CARD_WIDTH // 2, y + CARD_HEIGHT // 2))
             surface.blit(text, text_rect)
         else:
-            # Rita kortets bakgrund
             pygame.draw.rect(surface, WHITE, (x, y, CARD_WIDTH, CARD_HEIGHT))
             pygame.draw.rect(surface, BLACK, (x, y, CARD_WIDTH, CARD_HEIGHT), 2)
             font = pygame.font.Font(None, 24)
             text = font.render(f"{self.rank}{self.suit}", True, BLACK)
             surface.blit(text, (x + 5, y + 5))
-            # Rita kortets "spegel" i nedre högra hörnet
             text_small = font.render(f"{self.rank}{self.suit}", True, BLACK)
             text_small = pygame.transform.rotate(text_small, 180)
             surface.blit(text_small, (x + CARD_WIDTH - text_small.get_width() - 5,
@@ -119,7 +157,7 @@ class Deck:
 
     def deal_card(self):
         if len(self.cards) == 0:
-            self.__init__()  # Om kortleken tar slut – återställ
+            self.__init__()
         return self.cards.pop()
 
 
@@ -137,7 +175,6 @@ class Hand:
             total += card.get_value()
             if card.rank == 'A':
                 aces += 1
-        # Justera för ess
         while total > 21 and aces:
             total -= 10
             aces -= 1
@@ -166,10 +203,7 @@ class Button:
 
     def draw(self, surface):
         mouse_pos = pygame.mouse.get_pos()
-        if self.rect.collidepoint(mouse_pos):
-            current_color = self.hover_color
-        else:
-            current_color = self.base_color
+        current_color = self.hover_color if self.rect.collidepoint(mouse_pos) else self.base_color
         pygame.draw.rect(surface, current_color, self.rect)
         pygame.draw.rect(surface, WHITE, self.rect, 2)
         text_surf = self.font.render(self.text, True, self.text_color)
@@ -181,19 +215,43 @@ class Button:
 
 
 # ------------------------------
+# Dealer-turn med "mänsklig" interaktion
+# ------------------------------
+def dealer_turn(dealer_hand, deck):
+    dealer_comments = [
+        "Hmm, låt mig tänka...",
+        "Jag tar ett kort till.",
+        "Inte tillräckligt högt än!",
+        "Nu drar jag!"
+    ]
+    while dealer_hand.get_value() < 17:
+        comment = random.choice(dealer_comments)
+        screen.blit(background, (0, 0))
+        dealer_hand.draw(screen, 100, 100, hide_first=False)
+        draw_center_text(screen, comment, 36, WHITE, SCREEN_HEIGHT // 2)
+        pygame.display.flip()
+        pygame.time.delay(1000)
+        dealer_hand.add_card(deck.deal_card())
+    comment = "Jag stannar nu."
+    screen.blit(background, (0, 0))
+    dealer_hand.draw(screen, 100, 100, hide_first=False)
+    draw_center_text(screen, comment, 36, WHITE, SCREEN_HEIGHT // 2)
+    pygame.display.flip()
+    pygame.time.delay(1000)
+
+
+# ------------------------------
 # Lån Mini-Game
 # ------------------------------
 def loan_mini_game():
     """
-    Ett mini-game där spelaren måste trycka på mellanslag upprepade gånger för att
-    fylla en progressbar innan tiden tar slut (10 sekunder). Om progressbarens
-    värde når tröskeln lyckas du och får ett lån (ditt saldo återställs),
-    annars är det game over.
+    Mini-game: Tryck på mellanslag upprepade gånger under 10 sekunder för att fylla progressbaren.
+    Lyckas du får du ett lån (saldo återställs), misslyckas du – game over.
     """
     start_time = pygame.time.get_ticks()
     time_limit = 10000  # 10 sekunder
     progress = 0
-    required_progress = 100  # Målet
+    required_progress = 100
     font = pygame.font.Font(None, 36)
 
     while True:
@@ -207,16 +265,12 @@ def loan_mini_game():
                 sys.exit()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
-                    progress += 5  # Varje tryck ökar progressen
-
-        # Rita mini-game skärmen
+                    progress += 5
         screen.blit(background, (0, 0))
         draw_center_text(screen, "LÅN MINI-GAME", 48, WHITE, 50)
         draw_center_text(screen, "Tryck på mellanslag snabbt!", 32, WHITE, 100)
         timer_text = font.render(f"Resterande tid: {remaining // 1000}.{(remaining % 1000) // 100}s", True, WHITE)
         screen.blit(timer_text, (SCREEN_WIDTH // 2 - timer_text.get_width() // 2, 150))
-
-        # Rita progressbar
         bar_width = 400
         bar_height = 30
         bar_x = SCREEN_WIDTH // 2 - bar_width // 2
@@ -227,15 +281,12 @@ def loan_mini_game():
         pygame.draw.rect(screen, DARK_RED, (bar_x, bar_y, fill_width, bar_height))
         progress_text = font.render(f"{min(progress, required_progress)} / {required_progress}", True, WHITE)
         screen.blit(progress_text, (SCREEN_WIDTH // 2 - progress_text.get_width() // 2, bar_y + bar_height + 10))
-
         pygame.display.flip()
-
         if remaining <= 0:
             break
         if progress >= required_progress:
-            return True  # Lyckades
-
-    return False  # Misslyckades
+            return True
+    return False
 
 
 # ------------------------------
@@ -243,13 +294,11 @@ def loan_mini_game():
 # ------------------------------
 def betting_screen(current_money):
     """
-    Satsningsskärm: spelaren kan använda både knappar och tangentbordsinmatning
-    för att specificera insatsbeloppet.
-    Nu är alla element omplacerade så att de inte stör (ex. inte ligger över korten).
+    Satsningsskärm med både knapp- och tangentbordsinmatning.
+    Elementen är placerade högst upp, och spelar-/motståndarens namn visas.
     """
-    bet_str = ""  # Stränginmatning från tangentbordet
+    bet_str = ""
     bet = 0
-    # Placera elementen högst upp
     title_y = 100
     balance_y = 150
     input_box_y = 220
@@ -257,10 +306,13 @@ def betting_screen(current_money):
     confirm_y = 360
     instruction_y = 430
 
+    draw_text(screen, f"Spelare: {player_name}", 28, WHITE, (50, 20))
+    draw_text(screen, f"Motståndare: {opponent_name}", 28, WHITE, (50, 50))
+
     input_box = pygame.Rect(SCREEN_WIDTH // 2 - 100, input_box_y, 200, 40)
-    dec_button = Button((SCREEN_WIDTH // 2 - 220, buttons_y, 100, 50), DARK_RED, "Minska")
-    inc_button = Button((SCREEN_WIDTH // 2 + 120, buttons_y, 100, 50), DARK_RED, "Öka")
-    confirm_button = Button((SCREEN_WIDTH // 2 - 50, confirm_y, 100, 50), DARK_RED, "Satsa")
+    dec_button = Button((SCREEN_WIDTH // 2 - 220, buttons_y, 100, 50), YELLOW, "Minska", text_color=BLACK)
+    inc_button = Button((SCREEN_WIDTH // 2 + 120, buttons_y, 100, 50), YELLOW, "Öka", text_color=BLACK)
+    confirm_button = Button((SCREEN_WIDTH // 2 - 50, confirm_y, 100, 50), YELLOW, "Satsa", text_color=BLACK)
 
     selecting = True
     while selecting:
@@ -269,7 +321,6 @@ def betting_screen(current_money):
             if event.type == pygame.QUIT:
                 pygame.quit();
                 sys.exit()
-            # Tangentbordsinmatning
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_BACKSPACE:
                     bet_str = bet_str[:-1]
@@ -283,7 +334,6 @@ def betting_screen(current_money):
                 if bet > current_money:
                     bet = current_money
                     bet_str = str(bet)
-            # Musinput via knappar
             if event.type == pygame.MOUSEBUTTONDOWN:
                 pos = pygame.mouse.get_pos()
                 if inc_button.is_clicked(pos) and bet < current_money:
@@ -307,16 +357,18 @@ def betting_screen(current_money):
         inc_button.draw(screen)
         confirm_button.draw(screen)
         draw_center_text(screen, "Använd tangentbordet eller knapparna för att ange insats", 24, WHITE, instruction_y)
+        draw_text(screen, f"Spelare: {player_name}", 28, WHITE, (50, 20))
+        draw_text(screen, f"Motståndare: {opponent_name}", 28, WHITE, (50, 50))
         pygame.display.flip()
     return bet
 
 
 def round_summary_screen(player_hand, dealer_hand, outcome):
     """
-    Visar en sammanfattningsskärm med båda handarnas värden innan det
-    slutgiltiga resultatet avslöjas.
+    Visar en runda­sammanfattning med båda handarnas värden samt namn.
     """
-    continue_button = Button((SCREEN_WIDTH // 2 - 50, SCREEN_HEIGHT - 100, 100, 50), DARK_RED, "Fortsätt")
+    continue_button = Button((SCREEN_WIDTH // 2 - 50, SCREEN_HEIGHT - 100, 100, 50), YELLOW, "Fortsätt",
+                             text_color=BLACK)
     summary_shown = True
     while summary_shown:
         clock.tick(FPS)
@@ -331,9 +383,9 @@ def round_summary_screen(player_hand, dealer_hand, outcome):
         screen.blit(background, (0, 0))
         draw_center_text(screen, "Runda Sammanfattning", 48, WHITE, 50)
         player_hand.draw(screen, 100, SCREEN_HEIGHT - 200, hide_first=False)
-        draw_text(screen, f"Din poäng: {player_hand.get_value()}", 32, WHITE, (100, SCREEN_HEIGHT - 240))
+        draw_text(screen, f"{player_name}'s poäng: {player_hand.get_value()}", 32, WHITE, (100, SCREEN_HEIGHT - 240))
         dealer_hand.draw(screen, 100, 100, hide_first=False)
-        draw_text(screen, f"Dealerns poäng: {dealer_hand.get_value()}", 32, WHITE, (100, 60))
+        draw_text(screen, f"{opponent_name}'s poäng: {dealer_hand.get_value()}", 32, WHITE, (100, 60))
         draw_center_text(screen, "Tryck på 'Fortsätt' för att se resultatet", 28, WHITE, SCREEN_HEIGHT // 2)
         continue_button.draw(screen)
         pygame.display.flip()
@@ -354,7 +406,7 @@ def round_summary_screen(player_hand, dealer_hand, outcome):
 
 
 def game_over_screen():
-    """Visar en tydlig Game Over-skiss med information."""
+    """Visar en tydlig Game Over-skiss."""
     over = True
     while over:
         clock.tick(FPS)
@@ -378,7 +430,6 @@ def game_round(bet):
     player_hand = Hand()
     dealer_hand = Hand()
 
-    # Dela ut två kort vardera
     player_hand.add_card(deck.deal_card())
     player_hand.add_card(deck.deal_card())
     dealer_hand.add_card(deck.deal_card())
@@ -401,33 +452,31 @@ def game_round(bet):
                 if hit_button_rect.collidepoint(pos):
                     player_hand.add_card(deck.deal_card())
                     if player_hand.get_value() > 21:
-                        outcome = "Du fick för mycket! Du förlorade."
+                        outcome = f"{player_name}, du fick för mycket! Du förlorade."
                         player_turn = False
                         round_active = False
                 elif stand_button_rect.collidepoint(pos):
                     player_turn = False
 
         if not player_turn and round_active:
-            while dealer_hand.get_value() < 17:
-                pygame.time.delay(500)
-                dealer_hand.add_card(deck.deal_card())
+            dealer_turn(dealer_hand, deck)
             player_val = player_hand.get_value()
             dealer_val = dealer_hand.get_value()
             if player_val > 21:
-                outcome = "Du fick för mycket! Du förlorade."
+                outcome = f"{player_name}, du fick för mycket! Du förlorade."
             elif dealer_val > 21:
-                outcome = "Dealern fick för mycket! Du vann!"
+                outcome = f"{opponent_name} fick för mycket! Du vann!"
             elif dealer_val > player_val:
-                outcome = "Dealern vann!"
+                outcome = f"{opponent_name} vann!"
             elif dealer_val < player_val:
-                outcome = "Du vann!"
+                outcome = f"Du vann, {player_name}!"
             else:
                 outcome = "Oavgjort!"
             round_active = False
 
         screen.blit(background, (0, 0))
-        draw_center_text(screen, "Dealerns hand", 36, WHITE, 50)
-        draw_center_text(screen, "Din hand", 36, WHITE, SCREEN_HEIGHT - 200)
+        draw_center_text(screen, f"{opponent_name}'s hand", 36, WHITE, 50)
+        draw_center_text(screen, f"{player_name}'s hand", 36, WHITE, SCREEN_HEIGHT - 200)
         dealer_hand.draw(screen, 100, 100, hide_first=player_turn)
         player_hand.draw(screen, 100, SCREEN_HEIGHT - 200, hide_first=False)
         font = pygame.font.Font(None, 28)
@@ -435,8 +484,8 @@ def game_round(bet):
         if not player_turn:
             draw_text(screen, f"Värde: {dealer_hand.get_value()}", 28, WHITE, (100, 60))
         if player_turn:
-            hit_button = Button((100, SCREEN_HEIGHT - 100, 150, 50), DARK_RED, "Ta kort")
-            stand_button = Button((300, SCREEN_HEIGHT - 100, 150, 50), DARK_RED, "Stanna")
+            hit_button = Button((100, SCREEN_HEIGHT - 100, 150, 50), YELLOW, "Ta kort", text_color=BLACK)
+            stand_button = Button((300, SCREEN_HEIGHT - 100, 150, 50), YELLOW, "Stanna", text_color=BLACK)
             hit_button.draw(screen)
             stand_button.draw(screen)
         draw_text(screen, f"Pengar: {player_money} kr", 28, WHITE, (600, SCREEN_HEIGHT - 240))
@@ -450,7 +499,9 @@ def game_round(bet):
 # Huvudloopen för spelet
 # ------------------------------
 def main():
-    global player_money
+    global player_money, player_name, opponent_name
+    player_name, opponent_name = login_screen()
+
     waiting = True
     while waiting:
         clock.tick(FPS)
@@ -461,7 +512,8 @@ def main():
             if event.type in (pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN):
                 waiting = False
         screen.blit(background, (0, 0))
-        draw_center_text(screen, "Välkommen till Avancerat Blackjack!", 64, WHITE, SCREEN_HEIGHT // 2 - 50)
+        draw_center_text(screen, f"Välkommen, {player_name}!", 64, WHITE, SCREEN_HEIGHT // 2 - 100)
+        draw_center_text(screen, f"Motståndare: {opponent_name}", 36, WHITE, SCREEN_HEIGHT // 2 - 30)
         draw_center_text(screen, "Tryck på en tangent för att starta", 36, WHITE, SCREEN_HEIGHT // 2 + 20)
         pygame.display.flip()
 
@@ -469,16 +521,15 @@ def main():
     while playing:
         bet = betting_screen(player_money)
         outcome = game_round(bet)
-        if outcome in ["Du fick för mycket! Du förlorade.", "Dealern vann!"]:
+        if outcome in [f"{player_name}, du fick för mycket! Du förlorade.", f"{opponent_name} vann!"]:
             player_money -= bet
-        elif outcome in ["Dealern fick för mycket! Du vann!", "Du vann!"]:
+        elif outcome in [f"{opponent_name} fick för mycket! Du vann!", f"Du vann, {player_name}!"]:
             player_money += bet
 
-        # Om spelarens saldo understiger noll triggas lån-mini-gameet
         if player_money <= 0:
             loan_success = loan_mini_game()
             if loan_success:
-                player_money = 500  # Lånebelopp
+                player_money = 500
             else:
                 game_over_screen()
                 playing = False
