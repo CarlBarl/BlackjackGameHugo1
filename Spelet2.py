@@ -50,6 +50,7 @@ def draw_text(surface, text, size, color, pos):
     surface.blit(text_surf, pos)
 
 def create_gradient_surface(width, height, top_color, bottom_color):
+    """Skapar en vertikal gradient som bakgrund."""
     gradient = pygame.Surface((width, height))
     for y in range(height):
         ratio = y / height
@@ -59,8 +60,26 @@ def create_gradient_surface(width, height, top_color, bottom_color):
         pygame.draw.line(gradient, (r, g, b), (0, y), (width, y))
     return gradient
 
-# Skapa bakgrundsgradient
 background = create_gradient_surface(SCREEN_WIDTH, SCREEN_HEIGHT, (0, 0, 128), (0, 0, 255))
+
+# ------------------------------
+# Funktion för att rita dealerens figur
+# ------------------------------
+def draw_dealer_figure(surface, x, y):
+    """
+    Ritar en enkel stickfigur (gubbe) för dealern.
+    x, y anger centrum för huvudet.
+    """
+    # Huvud
+    pygame.draw.circle(surface, DARK_BLUE, (x, y), 30)
+    # Kropp
+    pygame.draw.line(surface, DARK_BLUE, (x, y+30), (x, y+80), 5)
+    # Armar
+    pygame.draw.line(surface, DARK_BLUE, (x, y+40), (x-40, y+60), 5)
+    pygame.draw.line(surface, DARK_BLUE, (x, y+40), (x+40, y+60), 5)
+    # Ben
+    pygame.draw.line(surface, DARK_BLUE, (x, y+80), (x-20, y+120), 5)
+    pygame.draw.line(surface, DARK_BLUE, (x, y+80), (x+20, y+120), 5)
 
 # ------------------------------
 # Las Vegas Introduktionsskärm
@@ -71,7 +90,7 @@ def las_vegas_screen():
     money_objects = []
     def spawn_money():
         x = random.randint(0, SCREEN_WIDTH - 50)
-        y = -50  # startar ovanför skärmen
+        y = -50
         speed = random.uniform(1, 2)
         return {"x": x, "y": y, "speed": speed}
     while pygame.time.get_ticks() - start_time < duration:
@@ -217,7 +236,7 @@ class Button:
         return self.rect.collidepoint(pos)
 
 # ------------------------------
-# Dealer-turn med "mänsklig" interaktion
+# Dealer-turn med "mänsklig" interaktion (med gubbe)
 # ------------------------------
 def dealer_turn(dealer_hand, deck):
     dealer_comments = [
@@ -230,6 +249,8 @@ def dealer_turn(dealer_hand, deck):
         comment = random.choice(dealer_comments)
         screen.blit(background, (0, 0))
         dealer_hand.draw(screen, 100, 150, hide_first=False)
+        # Rita dealerns figur (gubbe) bredvid korten:
+        draw_dealer_figure(screen, 400, 150)
         draw_center_text(screen, comment, 36, WHITE, SCREEN_HEIGHT // 2)
         pygame.display.flip()
         pygame.time.delay(1000)
@@ -237,44 +258,61 @@ def dealer_turn(dealer_hand, deck):
     comment = "Jag stannar nu."
     screen.blit(background, (0, 0))
     dealer_hand.draw(screen, 100, 150, hide_first=False)
+    draw_dealer_figure(screen, 400, 150)
     draw_center_text(screen, comment, 36, WHITE, SCREEN_HEIGHT // 2)
     pygame.display.flip()
     pygame.time.delay(1000)
+
+# ------------------------------
+# Funktion för att rita dealerns figur (gubbe)
+# ------------------------------
+def draw_dealer_figure(surface, x, y):
+    # Rita ett huvud (cirkel)
+    pygame.draw.circle(surface, DARK_BLUE, (x, y), 30)
+    # Rita kroppen (linje)
+    pygame.draw.line(surface, DARK_BLUE, (x, y+30), (x, y+80), 5)
+    # Rita armar
+    pygame.draw.line(surface, DARK_BLUE, (x, y+40), (x-40, y+60), 5)
+    pygame.draw.line(surface, DARK_BLUE, (x, y+40), (x+40, y+60), 5)
+    # Rita ben
+    pygame.draw.line(surface, DARK_BLUE, (x, y+80), (x-20, y+120), 5)
+    pygame.draw.line(surface, DARK_BLUE, (x, y+80), (x+20, y+120), 5)
 
 # ------------------------------
 # Arm wrestling-mini-spel (armbrytning)
 # ------------------------------
 def arm_wrestling_mini_game():
     """
-    Ett armbrytnings‑mini‑spel som varar i 7 sekunder.
-    Du börjar med en styrka på 50 (av 100). Varje tryck på mellanslag ger +3 poäng,
+    Ett armbrytnings-mini-spel som varar i 7 sekunder eller tills styrkan når 100.
+    Du börjar med en styrka på 50. Varje musklick ger +3 poäng,
     medan en nedgång om 0,25 poäng per frame sker.
-    För att vinna måste du ha minst 100 i styrka vid slutet.
+    Om styrkan når 100 innan tiden tar slut avslutas loopen direkt.
+    Om slutvärdet är minst 100 vinner du.
     """
     duration = 7000  # 7 sekunder
     start_time = pygame.time.get_ticks()
     strength = 50.0
     threshold = 100.0
     decay_per_frame = 0.25
-    while pygame.time.get_ticks() - start_time < duration:
+    # Lyssna på musklick istället för spacebar
+    while (pygame.time.get_ticks() - start_time < duration) and (strength < 100):
         clock.tick(FPS)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit(); sys.exit()
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    strength += 3
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                strength += 3
         strength -= decay_per_frame
-        strength = max(0, min(strength, 1000))
+        strength = max(0, strength)
         screen.blit(background, (0, 0))
         draw_center_text(screen, "ARMBRYTNING!", 48, WHITE, 50)
-        draw_center_text(screen, "Tryck på mellanslag för att pressa!", 32, WHITE, 100)
+        draw_center_text(screen, "Klicka för att pressa!", 32, WHITE, 100)
         bar_width = 400
         bar_height = 30
         bar_x = SCREEN_WIDTH // 2 - bar_width // 2
         bar_y = 250
         pygame.draw.rect(screen, WHITE, (bar_x, bar_y, bar_width, bar_height), 2)
-        fill_width = int((strength / 100) * bar_width)
+        fill_width = int((min(strength, 100) / 100) * bar_width)
         pygame.draw.rect(screen, DARK_RED, (bar_x, bar_y, fill_width, bar_height))
         status_text = DEFAULT_FONT.render(f"Styrka: {int(strength)}/100", True, WHITE)
         screen.blit(status_text, (SCREEN_WIDTH // 2 - status_text.get_width() // 2, bar_y + bar_height + 10))
@@ -286,11 +324,11 @@ def arm_wrestling_mini_game():
 # ------------------------------
 def loan_man_screen():
     """
-    Visar en interaktiv låneman-skärm. Lånemannen animeras in från vänster och visar
-    meddelandet "Grattis, du får ett lån!" tillsammans med en knapp "Få lån".
+    Visar en interaktiv låneman-skärm.
+    Lånemannen animeras in från vänster och visar "Grattis, du får ett lån!" tillsammans med en knapp "Få lån".
     När knappen klickas rensas skärmen, så att lånemannen inte syns i efterföljande rundor.
     """
-    duration = 3000  # Totalt 3 sekunder för inmatning
+    duration = 3000  # 3 sekunder total animationstid
     start_time = pygame.time.get_ticks()
     button_clicked = False
     button = Button((SCREEN_WIDTH // 2 - 50, SCREEN_HEIGHT - 150, 100, 50), WHITE, "Få lån", text_color=BLACK)
@@ -312,13 +350,12 @@ def loan_man_screen():
         draw_center_text(screen, "Grattis, du får ett lån!", 48, WHITE, SCREEN_HEIGHT // 2 + 50)
         button.draw(screen)
         pygame.display.flip()
-    # Rensa skärmen efter knapptryck
     screen.blit(background, (0, 0))
     pygame.display.flip()
     pygame.time.delay(500)
 
 # ------------------------------
-# Skärmar för satsning, runda­sammanfattning och game over
+# Skärmar för satsning, runda-sammanfattning och game over
 # ------------------------------
 def betting_screen(current_money):
     bet_str = ""
@@ -432,9 +469,6 @@ def game_over_screen():
         draw_center_text(screen, "Tryck på en tangent för att avsluta", 32, WHITE, SCREEN_HEIGHT // 2 + 20)
         pygame.display.flip()
 
-# ------------------------------
-# Huvudspelets runda
-# ------------------------------
 def game_round(bet):
     deck = Deck()
     player_hand = Hand()
@@ -497,9 +531,6 @@ def game_round(bet):
     round_summary_screen(player_hand, dealer_hand, outcome)
     return outcome
 
-# ------------------------------
-# Huvudloopen
-# ------------------------------
 def main():
     global player_money, player_name, opponent_name
     player_name, opponent_name = login_screen()
@@ -524,11 +555,13 @@ def main():
             player_money -= bet
         elif outcome in [f"{opponent_name} fick för mycket! Du vann!", f"Du vann, {player_name}!"]:
             player_money += bet
+        if player_money >= 3000:
+            new_house_screen()
+            player_money -= 3000
         if player_money <= 0:
             las_vegas_screen()
             if arm_wrestling_mini_game():
-                loan_man_screen()  # Visa lånemannens interaktiva skärm
-                # Rensa skärmen ordentligt
+                loan_man_screen()
                 screen.blit(background, (0, 0))
                 pygame.display.flip()
                 pygame.time.delay(500)
@@ -538,6 +571,23 @@ def main():
                 playing = False
     pygame.quit()
     sys.exit()
+
+def new_house_screen():
+    duration = 3000  # 3 sekunder
+    start_time = pygame.time.get_ticks()
+    while pygame.time.get_ticks() - start_time < duration:
+        clock.tick(FPS)
+        screen.blit(background, (0, 0))
+        house_x = SCREEN_WIDTH // 2 - 100
+        house_y = SCREEN_HEIGHT // 2 - 50
+        house_width = 200
+        house_height = 150
+        pygame.draw.rect(screen, GRAY, (house_x, house_y, house_width, house_height))
+        pygame.draw.polygon(screen, DARK_RED, [(house_x, house_y),
+                                               (house_x + house_width, house_y),
+                                               (house_x + house_width // 2, house_y - 80)])
+        draw_center_text(screen, "Grattis, du har köpt ett nytt hus!", 48, WHITE, SCREEN_HEIGHT // 2 + 150)
+        pygame.display.flip()
 
 if __name__ == "__main__":
     main()
